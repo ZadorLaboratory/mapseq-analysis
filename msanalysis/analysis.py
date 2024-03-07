@@ -10,6 +10,7 @@ import scipy
 
 from mapseq.utils import *
 from mapseq.stats import *
+from mapseq.core import *
 
 
 def make_heatmaps_combined_sns(config, sampdf, infiles, outfile=None, outdir=None, expid=None, 
@@ -72,12 +73,25 @@ def make_heatmaps_combined_sns(config, sampdf, infiles, outfile=None, outdir=Non
                 logging.warning(f'Unable to clustermap plot for {brain_id}. Message: {ee}')
 
 
-def binarize(val):
+def apply_binarize(val):
     if val == 0.0:
         return 0
     else:
         return 1
 
+
+def apply_encode(row):
+    '''
+    normally axis=1 (row)
+    '''
+    sum = 0
+    m = 1
+    for i in row:
+        sum += i * m
+        m += 1
+    return sum
+        
+ 
 #
 #  Code to make plots
 #  These accept the normalized barcode matrix. (real normalized by spike-ins). 
@@ -95,9 +109,9 @@ def boolean_sort(df):
     
     '''
     # make binarized df
-    bdf = pd.DataFrame(columns=list(df.columns))
+    bdf = pd.DataFrame(columns=list(df.columns), dtype='uint8')
     for col in list(df.columns):
-        bdf[col] = df[col].apply(binarize)
+        bdf[col] = df[col].apply(apply_binarize)
     sbdf = bdf.sort_values(by=list(bdf.columns))
     logging.debug(f'sorted binarized DF = {sbdf}')    
 
@@ -110,20 +124,24 @@ def boolean_sort(df):
         totals = totals + x.values
     df['code'] = totals
     sdf = df.sort_values('code')
-    sdf.drop('code', axis=1, inplace =True)
+    sdf.drop('code', axis=1, inplace=True)
     return sdf 
 
- 
+
 
 def plot_binarized(nbcdf, exp_id, brain_id):
     '''
-    all VBCs represented by rows, binarized. 
+    all VBCs represented by rows, binarized. e.g.: 
+    0 0 0 1
+    0 0 1 0 
+    0 0 1 1
+    0 1 0 0 
     
     '''
     bdf = pd.DataFrame(columns=list(nbcdf.columns))
     for col in list(nbcdf.columns):
-        bdf[col] = nbcdf[col].apply(binarize)
-    sbdf = bdf.sort_values(by=list(bdf.columns))
+        bdf[col] = nbcdf[col].apply(binarize).astype('uint8')
+    sbdf = bdf.sort_values(by=list(bdf.columns), ascending=False)
     logging.debug(f'sorted binarized DF = {sbdf}')
     num_vbcs = len(sbdf)
     #kws = dict(cbar_kws=dict(orientation='horizontal'))  
@@ -138,14 +156,33 @@ def plot_binarized(nbcdf, exp_id, brain_id):
     return g
 
 
+def plot_clustermap(nbcdf, exp_id, brain_id):
+    '''
+    https://github.com/mwaskom/seaborn/issues/1207
+    
+    '''
+    
+    
+    num_vbcs = len(nbcdf)
+    plt.figure(figsize=(10,8))
+    g = sns.clustermap(nbcdf, yticklabels=False, cmap='Blues',cbar=False, z_score=1)    
+    g.figure.suptitle(f'{exp_id} brain={brain_id}\nBooleansorted\n{num_vbcs} VBCs total')
+
+
 def plot_frequency_heatmap(nbcdf, exp_id, brain_id):
     '''
     rectangular heatmap, with square colors representing molecule counts. 
-    
     '''
     num_vbcs = len(nbcdf)
+    bdf = pd.DataFrame(columns=list(nbcdf.columns))
+    for col in list(nbcdf.columns):
+        bdf[col] = nbcdf[col].apply(binarize).astype('uint8')
+    nbcdf['code'] = bdf.apply(apply_encode, axis=1) 
+    
+      
+    
     sdf = boolean_sort(nbcdf)
-    logging.debug(f'sortedf =\n{sdf}')
+    #logging.debug(f'sortedf =\n{sdf}')
     #kws = dict(cbar_kws=dict(orientation='horizontal'))  
     plt.figure(figsize=(10,8))
     g = sns.heatmap(sdf, yticklabels=False, cmap='Blues',cbar=False)
@@ -156,6 +193,20 @@ def plot_frequency_heatmap(nbcdf, exp_id, brain_id):
     g.figure.suptitle(f'{exp_id} brain={brain_id}\nBooleansorted\n{num_vbcs} VBCs total')
     #g.ax_heatmap.set_title(f'Scaled {clustermap_scale}(umi_count)')       
     return g
+
+
+def normalize_log_z(nbcdf, logscale='log10'):
+    '''
+    log scales all values. 
+    compresses them to 0.0 - 1.0
+    
+    '''
+    lsdf = normalize_scale(nbcdf, 'log10')
+    max = lsdf.max().max()
+    lsdf = lsdf / max
+    return lsdf
+
+
 
 
 def make_plots(config, sampdf, infile, outfile=None, outdir=None, exp_id=None ):
@@ -191,10 +242,11 @@ def make_plots(config, sampdf, infile, outfile=None, outdir=None, exp_id=None ):
     
     page_dims = (11.7, 8.27)
     with pdfpages(outfile) as pdfpages:
-        g = plot_binarized(nbcmdf, exp_id, brain_id )
-        pdfpages.savefig(g.figure)
         g = plot_frequency_heatmap(nbcmdf, exp_id, brain_id)
         pdfpages.savefig(g.figure)
+        g = plot_binarized(nbcmdf, exp_id, brain_id )
+        pdfpages.savefig(g.figure)
+
     
     logging.info(f'wrote plot(s) to {outfile}')    
     #plt.imshow(sbdf.values, interpolation="nearest", cmap='Blues', aspect='auto')
