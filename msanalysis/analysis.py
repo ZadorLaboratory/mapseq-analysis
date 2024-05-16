@@ -8,6 +8,8 @@ import math
 import seaborn as sns
 import scipy
 
+from matplotlib.colors import LogNorm
+
 from mapseq.utils import *
 from mapseq.stats import *
 from mapseq.core import *
@@ -128,32 +130,157 @@ def boolean_sort(df):
     return sdf 
 
 
-
-def plot_binarized(nbcdf, exp_id, brain_id):
+def binarize_sort_matrix(df):
     '''
-    all VBCs represented by rows, binarized. e.g.: 
-    0 0 0 1
-    0 0 1 0 
-    0 0 1 1
-    0 1 0 0 
-    
+    return sorted binarized matrix. 
     '''
-    bdf = pd.DataFrame(columns=list(nbcdf.columns))
-    for col in list(nbcdf.columns):
-        bdf[col] = nbcdf[col].apply(binarize).astype('uint8')
+    bdf = pd.DataFrame(columns=list(df.columns))
+    for col in list(df.columns):
+        bdf[col] = df[col].apply(apply_binarize).astype('int8')
     sbdf = bdf.sort_values(by=list(bdf.columns), ascending=False)
-    logging.debug(f'sorted binarized DF = {sbdf}')
+    logging.debug(f'sorted binarized DF =\n{sbdf}')
+    return sbdf
+
+
+def threshold_binarized(df, min_rows=10):
+    '''
+    take sorted, binarized matrix
+    assumes dtype is int8
+    return only rows where rows in the pattern are greater than min_rows
+    '''
+    ### using index
+    #stbdf = df.astype('string')
+    #clist = list( stbdf.columns )
+    #clist.reverse()
+    #stbdf.index = stbdf[ clist ].agg(''.join, axis=1)
+    #stbdf = stbdf.astype('int8')
+    #booldf = stbdf.groupby(by=stbdf.index, sort=False).sum() > min_rows
+    #idxlist = list( (booldf.any(axis=1) == True).index )
+    #outdf = stbdf[stbdf.index.isin(idxlist)]
+    
+    # use throwaway column
+    stbdf = df.astype('string')
+    clist = list( stbdf.columns )
+    vclist = list( stbdf.columns )
+    stbdf['scode'] = stbdf[ clist ].agg(''.join, axis=1)
+    mapping = { k : 'int8' for k in vclist }
+    stbdf = stbdf.astype(mapping)
+    
+    b = stbdf.groupby(by=stbdf['scode'], sort=False).size() > min_rows
+    scodelist = list( b[b.values == True].index)
+    outdf = stbdf[ stbdf['scode'].isin(scodelist) ].copy()
+    outdf.drop(columns='scode', inplace=True)
+    return outdf
+    
+
+
+def plot_binarized(sbdf, label=None, info='binarized'):
+    '''
+    sorted, binarized matrix -> plot graphic
+    '''
+    if label is None:
+        label = 'M000'
+
     num_vbcs = len(sbdf)
     #kws = dict(cbar_kws=dict(orientation='horizontal'))  
     plt.figure(figsize=(10,8))
+    #norm = LogNorm()
+    #g = sns.heatmap(sbdf, yticklabels=False, norm=norm, cmap='Blues',cbar=False)
     g = sns.heatmap(sbdf, yticklabels=False, cmap='Blues',cbar=False)
     #g.ax_cbar.set_title('scaled log10(cts)')
     #x0, _y0, _w, _h = g.cbar_pos
     #g.ax_cbar.set_position((0.8, .2, .03, .4))
     #g.ax_cbar.set_position([x0, 0.9, g.ax_row_dendrogram.get_position().width, 0.05])
-    g.figure.suptitle(f'{exp_id} brain={brain_id}\nBinarized\n{num_vbcs} VBCs total')
+    g.figure.suptitle(f'{label}\n{num_vbcs} VBCs\n{info}')
     #g.ax_heatmap.set_title(f'Scaled {clustermap_scale}(umi_count)')       
     return g
+
+
+def get_plot_binarized(nbcdf, label=None, info='binarized'):
+    '''
+    input: normalized matrix. 
+    output: plot object
+    
+    '''
+    if label is None:
+        label = 'M000'
+    nbcdf = nbcdf.astype('float')
+    sbdf = binarize_sort_matrix(nbcdf )
+    g = plot_binarized(sbdf, label = label, info=info)
+    return g
+
+
+def make_plot_binarized(config, infile, outfile=None, label=None ):
+    '''
+    take normalized barcode matrix (nbcm.tsv) and do plot PDF. 
+    
+    '''    
+    import matplotlib.pyplot as plt
+
+    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} label={label}')
+
+    if label is None:
+        label = 'M000'
+      
+    filepath = os.path.abspath(infile)    
+    dirname = os.path.dirname(filepath)
+    filename = os.path.basename(filepath)
+    (base, ext) = os.path.splitext(filename) 
+       
+    if outfile is None:
+        outfile = f'{dirname}/{label}.binarized.pdf'
+    
+    nbcdf = load_df(filepath)          
+    logging.info(f'plotting file: {filename}')
+    logging.debug(f'inbound DF = {nbcdf}')   
+    g = get_plot_binarized(nbcdf, label )
+    plt.savefig(outfile)
+    logging.info(f'wrote plot(s) to {outfile}')    
+
+
+
+def make_plot_binarized_motifs(config, infile, 
+                               outfile=None, 
+                               label=None, 
+                               min_targets=2, 
+                               max_targets=5, 
+                               min_rows=20 ):
+    '''
+    take normalized barcode matrix (nbcm.tsv)
+    Remove all VBCs that project to less than <n_motifs> targets. 
+    make plot of remainder.      
+    
+    '''    
+    import matplotlib.pyplot as plt
+
+    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} label={label}')
+
+    if label is None:
+        label = 'M000'
+      
+    filepath = os.path.abspath(infile)    
+    dirname = os.path.dirname(filepath)
+    filename = os.path.basename(filepath)
+    (base, ext) = os.path.splitext(filename) 
+       
+    if outfile is None:
+        outfile = f'{dirname}/{label}.binarized.pdf'
+    
+    nbcdf = load_df(filepath) 
+    nbcdf = nbcdf.astype('float')
+             
+    logging.info(f'plotting file: {filename}')
+    logging.debug(f'inbound DF = {nbcdf}')
+
+    sbdf = binarize_sort_matrix(nbcdf )
+    fdf = sbdf[ sbdf.sum(axis=1) < max_targets ]
+    fdf = fdf[fdf.sum(axis=1) > min_targets ]
+    fdf = threshold_binarized(fdf, min_rows=min_rows)
+    #g = plot_binarized(fdf, label = label)
+    g = get_plot_binarized(fdf, label )
+    plt.savefig(outfile)
+    logging.info(f'wrote plot(s) to {outfile}')    
+
 
 
 def plot_clustermap(nbcdf, exp_id, brain_id):
@@ -161,8 +288,6 @@ def plot_clustermap(nbcdf, exp_id, brain_id):
     https://github.com/mwaskom/seaborn/issues/1207
     
     '''
-    
-    
     num_vbcs = len(nbcdf)
     plt.figure(figsize=(10,8))
     g = sns.clustermap(nbcdf, yticklabels=False, cmap='Blues',cbar=False, z_score=1)    
@@ -176,11 +301,10 @@ def plot_frequency_heatmap(nbcdf, exp_id, brain_id):
     num_vbcs = len(nbcdf)
     bdf = pd.DataFrame(columns=list(nbcdf.columns))
     for col in list(nbcdf.columns):
-        bdf[col] = nbcdf[col].apply(binarize).astype('uint8')
+        bdf[col] = nbcdf[col].apply(apply_binarize).astype('uint8')
     nbcdf['code'] = bdf.apply(apply_encode, axis=1) 
     
       
-    
     sdf = boolean_sort(nbcdf)
     #logging.debug(f'sortedf =\n{sdf}')
     #kws = dict(cbar_kws=dict(orientation='horizontal'))  
@@ -206,6 +330,24 @@ def normalize_log_z(nbcdf, logscale='log10'):
     lsdf = lsdf / max
     return lsdf
 
+
+def make_freq_lineplot(df, logx=False, logy=True, col='count', title=None):
+    '''
+   
+    
+    '''
+    plt.figure(figsize=(10,8))
+    yvals = ser.values
+    if logy:
+        yvals = np.log10(yvals)
+    xvals = ser.index
+    if logx:
+        xvals = np.log10(xvals)
+        
+    g = sns.lineplot(data = df, x=df.index, y = yvals)
+    g.figure.suptitle(f'{title}')     
+    return g
+    
 
 
 
@@ -242,8 +384,8 @@ def make_plots(config, sampdf, infile, outfile=None, outdir=None, exp_id=None ):
     
     page_dims = (11.7, 8.27)
     with pdfpages(outfile) as pdfpages:
-        g = plot_frequency_heatmap(nbcmdf, exp_id, brain_id)
-        pdfpages.savefig(g.figure)
+        #g = plot_frequency_heatmap(nbcmdf, exp_id, brain_id)
+        #pdfpages.savefig(g.figure)
         g = plot_binarized(nbcmdf, exp_id, brain_id )
         pdfpages.savefig(g.figure)
 

@@ -53,31 +53,18 @@ if __name__ == '__main__':
     parser.add_argument('-e','--expid', 
                     metavar='expid',
                     required=False,
-                    default='MAPseqDefault',
+                    default='M000',
                     type=str, 
                     help='explicitly provided experiment id')
 
-    parser.add_argument('-s','--sampleinfo', 
-                        metavar='sampleinfo',
-                        required=True,
-                        default=None,
-                        type=str, 
-                        help='XLS sampleinfo file or sampleinfo.tsv. ') 
-    
+   
     parser.add_argument('-o','--outfile', 
                     metavar='outfile',
                     required=False,
                     default=None, 
                     type=str, 
                     help='PDF plot out file. "simple_plots.pdf" if not given')  
-
-    parser.add_argument('-O','--outdir', 
-                    metavar='outdir',
-                    required=False,
-                    default=None, 
-                    type=str, 
-                    help='outdir. input file base dir if not given.')     
-
+ 
     parser.add_argument('infile',
                         metavar='infile',
                         type=str,
@@ -95,26 +82,8 @@ if __name__ == '__main__':
     cdict = {section: dict(cp[section]) for section in cp.sections()}
     
     logging.debug(f'Running with config. {args.config}: {cdict}')
-    logging.debug(f'infile={args.infile}')
-      
-   
-    outdir = None
-    if args.outdir is not None:
-        outdir = os.path.abspath(args.outdir)
-    else:
-        filepath = os.path.abspath(args.infile)    
-        dirname = os.path.dirname(filepath)
-        outdir = dirname
+    logging.debug(f'infile={args.infile} outfile={args.outfile} expid={args.expid}')
     
-    if args.outfile is None:
-        outfile = f'{outdir}/simple_plots.pdf'
-    else:
-        outfile = args.outfile
-        
-    logging.debug(f'outdir={outdir} outfile={outfile} ')
-    os.makedirs(outdir, exist_ok=True)    
-    sampdf = load_sample_info(cp, args.sampleinfo)
-    logging.debug(f'datatypes = {sampdf.dtypes} infile={args.infile} outfile={outfile} expid={args.expid}')
+    make_plot_binarized(cp, args.infile, outfile=args.outfile, label=args.expid )
     
-    make_plots(cp, sampdf, args.infile, outfile=outfile, outdir=outdir, exp_id=args.expid )
     

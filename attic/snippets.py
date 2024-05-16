@@ -1,3 +1,63 @@
+
+#
+#  Function from Emily Isko
+#
+def sorted_heatmap(df, title=None, sort_by=['type'], sort_ascend=True, drop=['type'], 
+                   nsample=None, random_state=10, log=False, cmap=orange_cmp, cbar=False,
+                   label_neurons=None, col_order=None, rasterized=True):
+    """_summary_
+
+    Args:
+        df (DataFrame): Dataframe to plot heatmap
+        sort_by (list, optional): How to sort neurons. Defaults to ['type'].
+        sort_ascend (boolean, optional): whether to sort ascending or descending. Defaults to True.
+        drop (list, optional): What columns to drop before plotting. Defaults to ['type'].
+        nsample (int, optional): If present, down sample dataframe. Defaults to None.
+        random_state (int, optional): If downsample, what random state to use. Defaults to 10.
+        log (bool, optional): Whether to plot log scale. Defaults to None.
+        cmap (colormap, optional): What colormap to use for plotting. Defaults orange_cmp.
+        cbar (boolean, optional): Whether to plot cbar or not. Defaults to False.
+        label_neurons (dict, option): Dictionary of label:index of neurons to label
+        col_order (list, optional): Order to plot columns. Defaults to None.
+        rasterized (boolean, optional): Wheter to rasterize plot. Defaults to True.
+    """
+
+    if nsample:
+        plot = df.sample(nsample, random_state=random_state)
+    else:
+        plot = df.copy()
+
+    if log:
+        plot = plot.replace({"IT":1, "CT":10, "PT":100})
+        norm = LogNorm()
+    else:
+        plot = plot.replace({"IT":0.25, "CT":0.5, "PT":0.75})
+        norm = None
+
+    plot = plot.sort_values(by=sort_by, ascending=sort_ascend)
+    plot = plot.reset_index(drop=True)
+    out_plot = plot.copy()
+
+
+    # reorder cols if given
+    if col_order:
+        plot = plot[col_order]
+
+    fig=plt.subplot()
+    sns.heatmap(plot.drop(drop, axis=1), norm=norm, cmap=cmap, cbar=cbar, rasterized=rasterized)
+    plt.gca().get_yaxis().set_visible(False)
+    plt.title(title)
+    if label_neurons:
+        for key in label_neurons.keys():
+            plt.text(-0.3,label_neurons[key], "-", va="center_baseline", size=15)
+            plt.text(-0.75,label_neurons[key], key, va="center_baseline", size=12)
+    return(out_plot, fig)
+
+
+
+#
+#  Function from Emily Isko
+#
 def sort_by_celltype(proj, it_areas=["OMCc", "AUD", "STR"], ct_areas=["TH"],
                       pt_areas=["AMY","HY","SNr","SCm","PG","PAG","BS"],
                       sort=True):
