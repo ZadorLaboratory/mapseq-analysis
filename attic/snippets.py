@@ -111,3 +111,29 @@ def sort_by_celltype(proj, it_areas=["OMCc", "AUD", "STR"], ct_areas=["TH"],
         df_out = pd.concat([ds_npt,ds_pt]).sort_index()
 
     return(df_out)
+
+
+
+
+def plot_viruslib(barcodematrixtsv):
+    #
+    # frequency plot of 
+    #
+    
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    
+    dirpath, base, ext = split_path(barcodematrixtsv)
+    
+    df = load_df(barcodematrixtsv)
+    rowsum = df.sum(axis=1)
+    rowsort = rowsum.sort_values(ascending=False)
+    df = pd.DataFrame(data=rowsort)
+    df.columns = ['counts']
+    df.reset_index(drop=True, inplace=True)
+    df['sequence'] = df.index +1
+    df['log_sequence'] = np.log2(df['sequence'])
+    ax = sns.lineplot(data=df, x=df.log_sequence, y=df.counts)
+    ax.set_title(f'{base} counts frequency')
+    
+

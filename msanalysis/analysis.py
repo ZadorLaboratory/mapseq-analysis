@@ -174,12 +174,12 @@ def threshold_binarized(df, min_rows=10):
     
 
 
-def plot_binarized(sbdf, label=None, info='binarized'):
+def plot_binarized(sbdf, expid=None, info='binarized'):
     '''
     sorted, binarized matrix -> plot graphic
     '''
-    if label is None:
-        label = 'M000'
+    if expid is None:
+        expid = 'M000'
 
     num_vbcs = len(sbdf)
     #kws = dict(cbar_kws=dict(orientation='horizontal'))  
@@ -191,36 +191,36 @@ def plot_binarized(sbdf, label=None, info='binarized'):
     #x0, _y0, _w, _h = g.cbar_pos
     #g.ax_cbar.set_position((0.8, .2, .03, .4))
     #g.ax_cbar.set_position([x0, 0.9, g.ax_row_dendrogram.get_position().width, 0.05])
-    g.figure.suptitle(f'{label}\n{num_vbcs} VBCs\n{info}')
+    g.figure.suptitle(f'{expid}\n{num_vbcs} VBCs\n{info}')
     #g.ax_heatmap.set_title(f'Scaled {clustermap_scale}(umi_count)')       
     return g
 
 
-def get_plot_binarized(nbcdf, label=None, info='binarized'):
+def get_plot_binarized(nbcdf, expid=None, info='binarized'):
     '''
     input: normalized matrix. 
     output: plot object
     
     '''
-    if label is None:
-        label = 'M000'
+    if expid is None:
+        expid = 'M000'
     nbcdf = nbcdf.astype('float')
     sbdf = binarize_sort_matrix(nbcdf )
-    g = plot_binarized(sbdf, label = label, info=info)
+    g = plot_binarized(sbdf, expid = expid, info=info)
     return g
 
 
-def make_plot_binarized(config, infile, outfile=None, label=None ):
+def make_plot_binarized(config, infile, outfile=None, expid=None, sampdf=None ):
     '''
     take normalized barcode matrix (nbcm.tsv) and do plot PDF. 
     
     '''    
     import matplotlib.pyplot as plt
 
-    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} label={label}')
+    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} expid={expid}')
 
-    if label is None:
-        label = 'M000'
+    if expid is None:
+        expid = 'M000'
       
     filepath = os.path.abspath(infile)    
     dirname = os.path.dirname(filepath)
@@ -228,12 +228,12 @@ def make_plot_binarized(config, infile, outfile=None, label=None ):
     (base, ext) = os.path.splitext(filename) 
        
     if outfile is None:
-        outfile = f'{dirname}/{label}.binarized.pdf'
+        outfile = f'{dirname}/{expid}.binarized.pdf'
     
     nbcdf = load_df(filepath)          
     logging.info(f'plotting file: {filename}')
     logging.debug(f'inbound DF = {nbcdf}')   
-    g = get_plot_binarized(nbcdf, label )
+    g = get_plot_binarized(nbcdf, expid )
     plt.savefig(outfile)
     logging.info(f'wrote plot(s) to {outfile}')    
 
@@ -241,7 +241,7 @@ def make_plot_binarized(config, infile, outfile=None, label=None ):
 
 def make_plot_binarized_motifs(config, infile, 
                                outfile=None, 
-                               label=None, 
+                               expid=None, 
                                min_targets=2, 
                                max_targets=5, 
                                min_rows=20 ):
@@ -253,10 +253,10 @@ def make_plot_binarized_motifs(config, infile,
     '''    
     import matplotlib.pyplot as plt
 
-    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} label={label}')
+    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} expid={expid}')
 
-    if label is None:
-        label = 'M000'
+    if expid is None:
+        expid = 'M000'
       
     filepath = os.path.abspath(infile)    
     dirname = os.path.dirname(filepath)
@@ -264,7 +264,7 @@ def make_plot_binarized_motifs(config, infile,
     (base, ext) = os.path.splitext(filename) 
        
     if outfile is None:
-        outfile = f'{dirname}/{label}.binarized.pdf'
+        outfile = f'{dirname}/{expid}.binarized.pdf'
     
     nbcdf = load_df(filepath) 
     nbcdf = nbcdf.astype('float')
@@ -277,7 +277,7 @@ def make_plot_binarized_motifs(config, infile,
     fdf = fdf[fdf.sum(axis=1) > min_targets ]
     fdf = threshold_binarized(fdf, min_rows=min_rows)
     #g = plot_binarized(fdf, label = label)
-    g = get_plot_binarized(fdf, label )
+    g = get_plot_binarized(fdf, expid )
     plt.savefig(outfile)
     logging.info(f'wrote plot(s) to {outfile}')    
 

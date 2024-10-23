@@ -84,7 +84,7 @@ if __name__ == '__main__':
                     required=False,
                     default=None, 
                     type=str, 
-                    help='PDF plot out file. "simple_plots.pdf" if not given')  
+                    help='PDF plot out file. "binarized_motifs_plot.pdf" if not given')  
  
     parser.add_argument('infile',
                         metavar='infile',
@@ -103,14 +103,34 @@ if __name__ == '__main__':
     cdict = {section: dict(cp[section]) for section in cp.sections()}
     
     logging.debug(f'Running with config. {args.config}: {cdict}')
-    logging.debug(f'infile={args.infile} outfile={args.outfile} expid={args.expid}')
 
+    # set outdir / outfile
+    outdir = os.path.abspath('./')
+    outfile = f'{outdir}/binarized_motifs_{args.mintarget}.{args.maxtarget}.{args.minbarcodes}_plot.pdf'
+    if args.outfile is not None:
+        logging.debug(f'outfile specified.')
+        outfile = os.path.abspath(args.outfile)
+        filepath = os.path.abspath(outfile)    
+        dirname = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        (base, ext) = os.path.splitext(filename)   
+        head = base.split('.')[0]
+        outdir = dirname
+        logging.debug(f'outdir set to {outdir}')
+    else:
+        logging.debug(f'outfile not specified. using default {outfile}')        
+
+    outdir = os.path.abspath(outdir)    
+    os.makedirs(outdir, exist_ok=True)    
+    
+    logging.debug(f'infile={args.infile} outfile={outfile} expid={args.expid}')
    
-    make_plot_binarized_motifs(cp, args.infile, outfile=args.outfile, 
+    make_plot_binarized_motifs(cp, 
+                               args.infile, 
+                               outfile=args.outfile, 
                                label=args.expid,
                                min_targets=args.mintarget,
                                max_targets=args.maxtarget,
                                min_rows = args.minbarcodes
                                )
-    
-    
+       

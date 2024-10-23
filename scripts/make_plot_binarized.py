@@ -68,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('infile',
                         metavar='infile',
                         type=str,
-                        help='Normalized barcode matrix (<brain>.nbcm.tsv) from process_merged.py')
+                        help='Normalized barcode matrix (<brain>.nbcm.tsv) from make_matrices.py')
        
     args= parser.parse_args()
     
@@ -83,7 +83,26 @@ if __name__ == '__main__':
     
     logging.debug(f'Running with config. {args.config}: {cdict}')
     logging.debug(f'infile={args.infile} outfile={args.outfile} expid={args.expid}')
+
+    # set outdir / outfile
+    outdir = os.path.abspath('./')
+    outfile = f'{outdir}/binarized_plot.pdf'
+    if args.outfile is not None:
+        logging.debug(f'outfile specified.')
+        outfile = os.path.abspath(args.outfile)
+        filepath = os.path.abspath(outfile)    
+        dirname = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        (base, ext) = os.path.splitext(filename)   
+        head = base.split('.')[0]
+        outdir = dirname
+        logging.debug(f'outdir set to {outdir}')
+    else:
+        logging.debug(f'outfile not specified. using default {outfile}')        
+
+    outdir = os.path.abspath(outdir)    
+    os.makedirs(outdir, exist_ok=True)    
     
-    make_plot_binarized(cp, args.infile, outfile=args.outfile, label=args.expid )
+    make_plot_binarized(cp, args.infile, outfile=args.outfile, expid=args.expid )
     
     
