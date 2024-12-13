@@ -55,8 +55,14 @@ if __name__ == '__main__':
                     required=False,
                     default='M000',
                     type=str, 
-                    help='explicitly provided experiment id')
+                    help='experiment and/or brain label.')
 
+    parser.add_argument('-s','--sampleinfo', 
+                        metavar='sampleinfo',
+                        required=False,
+                        default=None,
+                        type=str, 
+                        help='XLS sampleinfo file. ')
    
     parser.add_argument('-o','--outfile', 
                     metavar='outfile',
@@ -64,6 +70,13 @@ if __name__ == '__main__':
                     default=None, 
                     type=str, 
                     help='PDF plot out file. "simple_plots.pdf" if not given')  
+
+    parser.add_argument('-L','--label_column', 
+                    metavar='label_column',
+                    required=False,
+                    default=None, 
+                    type=str, 
+                    help='Labels for columns. Requires sampleinfo. [region|samplename|rtprimer]')
  
     parser.add_argument('infile',
                         metavar='infile',
@@ -100,9 +113,20 @@ if __name__ == '__main__':
     else:
         logging.debug(f'outfile not specified. using default {outfile}')        
 
+    if args.sampleinfo is not None:
+        logging.debug(f'loading sample DF...')
+        sampdf = load_sample_info(cp, args.sampleinfo)
+        logging.debug(f'\n{sampdf}')
+        sampdf.to_csv(f'{outdir}/sampleinfo.tsv', sep='\t')
+    else:
+        sampdf = None
+
+    
+
     outdir = os.path.abspath(outdir)    
     os.makedirs(outdir, exist_ok=True)    
     
-    make_plot_binarized(cp, args.infile, outfile=args.outfile, expid=args.expid )
+    make_plot_binarized(cp, args.infile, outfile=args.outfile, expid=args.expid, 
+                        label_column=args.label_column, sampdf=sampdf )
     
     

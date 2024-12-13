@@ -15,6 +15,16 @@ from mapseq.stats import *
 from mapseq.core import *
 
 
+SAMPLEINFO_COLUMNS = ['usertube', 
+                        'ourtube', 
+                        'samplename', 
+                        'siteinfo', 
+                        'rtprimer', 
+                        'brain', 
+                        'region', 
+                        'matrixcolumn'] 
+
+
 def make_heatmaps_combined_sns(config, sampdf, infiles, outfile=None, outdir=None, expid=None, 
                                recursion=200000, combined_pdf=True ):
     # def make_merged_plots_new(config, outdir=None, expid=None, recursion=200000, combined_pdf=True, label_column='region' ):
@@ -210,14 +220,14 @@ def get_plot_binarized(nbcdf, expid=None, info='binarized'):
     return g
 
 
-def make_plot_binarized(config, infile, outfile=None, expid=None, sampdf=None ):
+def make_plot_binarized(config, infile, outfile=None, expid=None, label_column=None, sampdf=None ):
     '''
     take normalized barcode matrix (nbcm.tsv) and do plot PDF. 
     
     '''    
     import matplotlib.pyplot as plt
 
-    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} expid={expid}')
+    logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} expid={expid} label_column={label_column}')
 
     if expid is None:
         expid = 'M000'
@@ -232,7 +242,31 @@ def make_plot_binarized(config, infile, outfile=None, expid=None, sampdf=None ):
     
     nbcdf = load_df(filepath)          
     logging.info(f'plotting file: {filename}')
-    logging.debug(f'inbound DF = {nbcdf}')   
+    logging.debug(f'inbound DF = {nbcdf} columns={nbcdf.columns}')   
+    if label_column is not None:
+        logging.debug('altering labels for plot columns.')
+        if label_column in SAMPLEINFO_COLUMNS:
+            lcol = sampdf[label_column]
+            if sampdf is not None:
+                oldcolumns = nbcdf.columns
+                logging.debug(f'renaming columns to labels in sampleinfo...')
+                sampdf['bclabel'] = 'BC'+ sampdf['rtprimer']
+                newcolumns = []
+                for col in nbcdf.columns:
+                    newval = sampdf[sampdf['bclabel'] == col][label_column].values[0]
+                    if newval in newcolumns:
+                        nidx = newcolumns.count(newval) + 1
+                        newval = f'{newval}.{nidx}'
+                    newcolumns.append( newval )
+                nbcdf.columns = newcolumns
+                scol = natsorted(list(nbcdf.columns))
+                nbcdf = nbcdf[scol]  
+                logging.debug(f'reset and sorted columns in matrix. old={oldcolumns} new={list(nbcdf.columns)} ')    
+            else:
+                logging.warning('no sampleinfo specified, so ignoring label.')
+        else:
+            logging.warning(f'label_column {label_column} not valid sampleinfo column')
+
     g = get_plot_binarized(nbcdf, expid )
     plt.savefig(outfile)
     logging.info(f'wrote plot(s) to {outfile}')    
