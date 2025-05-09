@@ -128,7 +128,6 @@ if __name__ == '__main__':
     make_plot_binarized_motifs(cp, 
                                args.infile, 
                                outfile=args.outfile, 
-                               label=args.expid,
                                min_targets=args.mintarget,
                                max_targets=args.maxtarget,
                                min_rows = args.minbarcodes

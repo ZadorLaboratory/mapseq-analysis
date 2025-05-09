@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('-e','--expid', 
                     metavar='expid',
                     required=False,
-                    default='M000',
+                    default=None,
                     type=str, 
                     help='experiment and/or brain label.')
 
@@ -113,6 +113,9 @@ if __name__ == '__main__':
     else:
         logging.debug(f'outfile not specified. using default {outfile}')        
 
+    outdir = os.path.abspath(outdir)    
+    os.makedirs(outdir, exist_ok=True)
+
     if args.sampleinfo is not None:
         logging.debug(f'loading sample DF...')
         sampdf = load_sample_info(cp, args.sampleinfo)
@@ -120,13 +123,8 @@ if __name__ == '__main__':
         sampdf.to_csv(f'{outdir}/sampleinfo.tsv', sep='\t')
     else:
         sampdf = None
-
-    
-
-    outdir = os.path.abspath(outdir)    
-    os.makedirs(outdir, exist_ok=True)    
-    
-    make_plot_binarized(cp, args.infile, outfile=args.outfile, expid=args.expid, 
-                        label_column=args.label_column, sampdf=sampdf )
+      
+    make_plot_binarized(args.infile, outfile=args.outfile, expid=args.expid, 
+                        label_column=args.label_column, sampdf=sampdf, cp=cp )
     
     

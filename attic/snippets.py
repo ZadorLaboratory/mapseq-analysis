@@ -137,3 +137,15 @@ def plot_viruslib(barcodematrixtsv):
     ax.set_title(f'{base} counts frequency')
     
 
+def make_clustered_heatmap(df, outprefix, columns=None ):
+    '''
+    
+    Caller should edit columns in order to exclude injection areas from plot. 
+    '''
+    camp = 'Reds'
+    g = sns.clustermap(df, cmap=camp, yticklabels=False, col_cluster=False, standard_scale=0)
+    g.fig.subplots_adjust(right=0.7)
+    g.ax_cbar.set_position((0.8, .2, .03, .4))
+    plt.title(f'{prefix}\nCounts')
+    plt.savefig(f'{outprefix}.heatmap.pdf')
+    logging.info(f'done making {outprefix}.heatmap.pdf ')

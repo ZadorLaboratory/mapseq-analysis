@@ -15,7 +15,7 @@ from mapseq.stats import *
 from mapseq.core import *
 
 
-SAMPLEINFO_COLUMNS = ['usertube', 
+SAMPLEINFO_COLUMNS = [  'usertube', 
                         'ourtube', 
                         'samplename', 
                         'siteinfo', 
@@ -220,7 +220,7 @@ def get_plot_binarized(nbcdf, expid=None, info='binarized'):
     return g
 
 
-def make_plot_binarized(config, infile, outfile=None, expid=None, label_column=None, sampdf=None ):
+def make_plot_binarized(infile, outfile=None, expid=None, label_column=None, sampdf=None, cp=None ):
     '''
     take normalized barcode matrix (nbcm.tsv) and do plot PDF. 
     
@@ -229,8 +229,11 @@ def make_plot_binarized(config, infile, outfile=None, expid=None, label_column=N
 
     logging.debug(f'make_plot_binarized(): infile={infile} outfile={outfile} expid={expid} label_column={label_column}')
 
+    if cp is None:
+        cp= get_default_config()
+
     if expid is None:
-        expid = 'M000'
+        expid = cp.get('project','project_id')
       
     filepath = os.path.abspath(infile)    
     dirname = os.path.dirname(filepath)
@@ -240,7 +243,7 @@ def make_plot_binarized(config, infile, outfile=None, expid=None, label_column=N
     if outfile is None:
         outfile = f'{dirname}/{expid}.binarized.pdf'
     
-    nbcdf = load_df(filepath)          
+    nbcdf = load_mapseq_matrix_df(filepath)          
     logging.info(f'plotting file: {filename}')
     logging.debug(f'inbound DF = {nbcdf} columns={nbcdf.columns}')   
     if label_column is not None:
@@ -371,6 +374,8 @@ def make_freq_lineplot(df, logx=False, logy=True, col='count', title=None):
     
     '''
     plt.figure(figsize=(10,8))
+    ser = df[col].sort_values(ascending=False)
+    ser.reset_index(inplace=True, drop=True)
     yvals = ser.values
     if logy:
         yvals = np.log10(yvals)
