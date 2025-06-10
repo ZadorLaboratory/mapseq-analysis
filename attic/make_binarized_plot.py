@@ -78,10 +78,11 @@ if __name__ == '__main__':
                     type=str, 
                     help='Labels for columns. Requires sampleinfo. [region|samplename|rtprimer]')
  
-    parser.add_argument('infile',
-                        metavar='infile',
+    parser.add_argument('infile' ,
+                        metavar='infile', 
                         type=str,
-                        help='Normalized barcode matrix (<brain>.nbcm.tsv) from make_matrices.py')
+                        default=None, 
+                        help="One normalized barcode matrix files (e.g. '<brain>.nbcm.tsv')")
        
     args= parser.parse_args()
     
@@ -123,8 +124,12 @@ if __name__ == '__main__':
         sampdf.to_csv(f'{outdir}/sampleinfo.tsv', sep='\t')
     else:
         sampdf = None
-      
-    make_plot_binarized(args.infile, outfile=args.outfile, expid=args.expid, 
-                        label_column=args.label_column, sampdf=sampdf, cp=cp )
+        
+    make_binarized_plot(args.infile, 
+                        outfile=args.outfile, 
+                        expid=args.expid, 
+                        label_column=args.label_column, 
+                        sampdf=sampdf, 
+                        cp=cp )
     
     
