@@ -1,19 +1,21 @@
 import logging
+import math
+
 import pandas as pd
 import numpy as np
-from natsort import natsorted
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
-import matplotlib.pyplot as plt
-import math
 import seaborn as sns
 import scipy
+from natsort import natsorted
 
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages as pdfpages   
+logging.getLogger('matplotlib').setLevel(logging.WARNING)    
 from matplotlib.colors import LogNorm
 
 from mapseq.utils import *
 from mapseq.stats import *
 from mapseq.core import *
-
 
 SAMPLEINFO_COLUMNS = [  'usertube', 
                         'ourtube', 
@@ -24,9 +26,11 @@ SAMPLEINFO_COLUMNS = [  'usertube',
                         'region', 
                         'matrixcolumn'] 
 
+####################################################
 #
-#    UTILITIES
+#                     UTILITIES
 #
+####################################################
 
 def get_mainbase(filepath):
     '''
@@ -49,14 +53,16 @@ def apply_binarize(val):
 def apply_encode(row):
     '''
     normally axis=1 (row)
+    Assumes binary input vlues in row (0|1)
+    Returns coded sum of totals.  0 1 1 0 1  -> 1101.0 
+    
     '''
     sum = 0
     m = 1
-    for i in row:
-        sum += i * m
-        m += 1
+    for i, v in enumerate( row ):
+        m = m * 10
+        sum += v * m
     return sum
-
 
 def normalize_log_z(nbcdf, logscale='log10'):
     '''
@@ -93,7 +99,6 @@ def boolean_sort(df):
     sdf = df.sort_values('code')
     sdf.drop('code', axis=1, inplace=True)
     return sdf 
-
 
 def binarize_sort_matrix(df):
     '''
@@ -136,6 +141,26 @@ def threshold_binarized(df, min_rows=10):
 #  projection frequency   number of distinct neurons (VBCs) to target 
 #  projection strength    number of unique VBC molecules, irrespective of neurons (# of unique VBCs)
 #  projection intensity   number of unique VBC molecules for a given neuron (unique VBC)
+#
+#
+
+def make_plots_pdf(infiles,
+                   outfile,
+                   binarized=True,
+                   motif_min=0,
+                   motif_max=99,
+                   sampdf=None, 
+                   label_column=None,
+                   cp=None
+                   ):
+    '''
+    @arg infiles        Barcode matrix files. reals, spikes, or normalized.
+    @arg outfile        Outfile name.  Will respect .pdf or .png
+    @arg sampdf         Standard samplefile .xlsx or .tsv
+    @arg label_column   Column in sampdf to map to. [ label | region ] 
+    @arg cp             Standard mapseq config. 
+    '''
+
 
 def make_binarized_plots_pdf(infiles, 
                              outfile,  
@@ -145,9 +170,8 @@ def make_binarized_plots_pdf(infiles,
                              cp=None):
     '''
     Make appropriate plot files for all input XYZ.nbcm.tsv files. 
-    -> XYZ.binarized.pdf
-    
-    Title:  XYZ VBC binarized. 
+    One per page. 
+
     
     '''    
     import matplotlib.pyplot as plt    
@@ -209,16 +233,83 @@ def make_binarized_plots_pdf(infiles,
     logging.info(f'wrote plot(s) to {outfile}')
 
 
-def make_plot_binarized_motifs(config, infile, 
+def make_heatmap_matrix_pdf(infiles, 
+                            outfile,  
+                            label_column=None, 
+                            sampdf=None,
+                            titletext=None,  
+                            cp=None):
+    '''
+    Make appropriate plot files for all input XYZ.nbcm.tsv files. 
+    One per page. 
+    
+    '''    
+    import matplotlib.pyplot as plt    
+    from matplotlib.backends.backend_pdf import PdfPages as pdfpages
+
+    logging.debug(f'make_heatmap_plots_pdf(): infiles={infiles} outfile={outfile} label_column={label_column}')
+
+    if cp is None:
+        cp= get_default_config()
+
+    project_id = cp.get('project','project_id')
+
+    if outfile is None:
+        outdir = os.path.abspath('./')
+        outfile = f'{outdir}/{project_id}.heatmap_plot.pdf'
+
+    page_dims = (11.7, 8.27)
+    with pdfpages(outfile) as pdfpages:
+        for infile in infiles:
+            brain = get_mainbase(infile)
+            filepath = os.path.abspath(infile)
+            logging.info(f'plotting {infile} -> {outfile} ')
+            nbcdf = load_mapseq_matrix_df(filepath)          
+            label = f'brain={brain} n_vbcs={len(nbcdf)}'
+            if titletext is not None:
+                label += f'\n{titletext}'                        
+            logging.debug(f'inbound DF = {nbcdf} columns={nbcdf.columns}')   
+            if label_column is not None:
+                logging.debug('altering labels for plot columns.')
+                if label_column in SAMPLEINFO_COLUMNS:
+                    lcol = sampdf[label_column]
+                    if sampdf is not None:
+                        oldcolumns = nbcdf.columns
+                        logging.debug(f'renaming columns to labels in sampleinfo...')
+                        sampdf['bclabel'] = 'BC'+ sampdf['rtprimer']
+                        newcolumns = []
+                        for col in nbcdf.columns:
+                            newval = sampdf[sampdf['bclabel'] == col][label_column].values[0]
+                            if newval in newcolumns:
+                                nidx = newcolumns.count(newval) + 1
+                                newval = f'{newval}.{nidx}'
+                            newcolumns.append( newval )
+                        nbcdf.columns = newcolumns
+                        scol = natsorted(list(nbcdf.columns))
+                        nbcdf = nbcdf[scol]  
+                        logging.debug(f'reset and sorted columns in matrix. old={oldcolumns} new={list(nbcdf.columns)} ')    
+                    else:
+                        logging.warning('no sampleinfo specified, so ignoring label.')
+                else:
+                    logging.warning(f'label_column {label_column} not valid sampleinfo column')
+            else:
+                logging.debug('No label specified, so using data column names.')
+        
+            ax = get_plot_heatmap( nbcdf, label, cp=cp)
+            pdfpages.savefig(ax.figure)
+    logging.info(f'wrote plot(s) to {outfile}')
+
+
+def make_binarized_motifs(config, infile, 
                                outfile=None, 
                                expid=None, 
                                min_targets=2, 
                                max_targets=5, 
                                min_rows=20 ):
     '''
-    take normalized barcode matrix (nbcm.tsv)
-    Remove all VBCs that project to less than <n_motifs> targets. 
-    make plot of remainder.      
+    Take normalized barcode matrix (nbcm.tsv)
+    Remove all VBCs that project to less than <min_targets> targets. 
+    Remove all that project to more than <max_targets>
     
     '''    
     import matplotlib.pyplot as plt
@@ -252,18 +343,12 @@ def make_plot_binarized_motifs(config, infile,
     logging.info(f'wrote plot(s) to {outfile}')   
 
 
-def make_heatmaps_combined_sns(config, 
-                               sampdf, 
-                               infiles, 
-                               outfile=None, 
-                               outdir=None, 
-                               expid=None, 
-                               recursion=200000, 
-                               combined_pdf=True ):
-    # def make_merged_plots_new(config, outdir=None, expid=None, recursion=200000, combined_pdf=True, label_column='region' ):
+def make_clustermap_pdf( infiles,
+                         sampdf, 
+                         outfile,  
+                         config ):
     '''
-    consume barcode matrices and create heatmap plots.
-    Will label plots with leading portion of filename, assuming it is a brain id. 
+
     
     '''
     from matplotlib.backends.backend_pdf import PdfPages as pdfpages
@@ -271,7 +356,7 @@ def make_heatmaps_combined_sns(config,
     
     clustermap_scale = config.get('plots','clustermap_scale') # log10 | log2
     cmap = config.get('plots','heatmap_cmap')
-
+    logging.debug(f'clustermap_scale={clustermap_scale} cmap={cmap}')
 
     if outfile is None:
         outfile = 'heatmaps.pdf'
@@ -317,6 +402,13 @@ def make_heatmaps_combined_sns(config,
             except Exception as ee:
                 logging.warning(f'Unable to clustermap plot for {brain_id}. Message: {ee}')
 
+#
+# DATAFRAME/DATA SUBFUNCTIONS
+#
+
+
+
+
 
 #
 #  PLOTTING SUB-FUNCTIONS
@@ -334,6 +426,25 @@ def get_plot_binarized(nbcdf, expid=None, info='binarized'):
     g = plot_binarized(sbdf, expid = expid, info=info)
     return g
 
+def get_plot_heatmap(nbcdf, label='heatmap', cp=None):
+    '''
+    input: normalized matrix. 
+    output: plot object
+    
+    '''
+    if cp is None:
+        cp = get_default_config()
+    cmap = cp.get('plots','heatmap_cmap')
+    project_id = cp.get('project','project_id')
+    logging.debug(f'cmap={cmap}')
+
+    nbcdf = nbcdf.astype('float')
+    adf = get_binarized_sorted_intensity_matrix(nbcdf, lognorm = True)    
+    g = sns.heatmap(adf, cmap=cmap, cbar=False)
+    g.figure.suptitle(f'{project_id}\n{label}')
+    plt.xlabel('Targets')
+    plt.ylabel('Binarized combinations') 
+    return g
 
 def plot_binarized(sbdf, expid=None, info='binarized'):
     '''
@@ -343,17 +454,10 @@ def plot_binarized(sbdf, expid=None, info='binarized'):
         expid = 'M000'
 
     num_vbcs = len(sbdf)
-    #kws = dict(cbar_kws=dict(orientation='horizontal'))  
+  
     plt.figure(figsize=(10,8))
-    #norm = LogNorm()
-    #g = sns.heatmap(sbdf, yticklabels=False, norm=norm, cmap='Blues',cbar=False)
     g = sns.heatmap(sbdf, yticklabels=False, cmap='Blues',cbar=False)
-    #g.ax_cbar.set_title('scaled log10(cts)')
-    #x0, _y0, _w, _h = g.cbar_pos
-    #g.ax_cbar.set_position((0.8, .2, .03, .4))
-    #g.ax_cbar.set_position([x0, 0.9, g.ax_row_dendrogram.get_position().width, 0.05])
-    g.figure.suptitle(f'{expid}\n{num_vbcs} VBCs\n{info}')
-    #g.ax_heatmap.set_title(f'Scaled {clustermap_scale}(umi_count)')       
+    g.figure.suptitle(f'{expid}\n{num_vbcs} VBCs\n{info}')    
     return g
 
 
@@ -378,17 +482,68 @@ def plot_frequency_heatmap(nbcdf, exp_id, brain_id):
         bdf[col] = nbcdf[col].apply(apply_binarize).astype('uint8')
     nbcdf['code'] = bdf.apply(apply_encode, axis=1)   
     sdf = boolean_sort(nbcdf)
-    #logging.debug(f'sortedf =\n{sdf}')
-    #kws = dict(cbar_kws=dict(orientation='horizontal'))  
+  
     plt.figure(figsize=(10,8))
     g = sns.heatmap(sdf, yticklabels=False, cmap='Blues',cbar=False)
-    #g.ax_cbar.set_title('scaled log10(cts)')
-    #x0, _y0, _w, _h = g.cbar_pos
-    #g.ax_cbar.set_position((0.8, .2, .03, .4))
-    #g.ax_cbar.set_position([x0, 0.9, g.ax_row_dendrogram.get_position().width, 0.05])
     g.figure.suptitle(f'{exp_id} brain={brain_id}\nBooleansorted\n{num_vbcs} VBCs total')
-    #g.ax_heatmap.set_title(f'Scaled {clustermap_scale}(umi_count)')       
     return g
+
+
+def get_binarized_sorted_intensity_matrix(df, lognorm = True):
+    '''
+    Take matrix. 
+    Binarize by bin_code 
+    Aggregate by bin_code, summing cell values (umi counts or normalized). 
+    '''
+    cols = list(df.columns)
+    bdf = pd.DataFrame(columns=cols, dtype='uint8')
+    for col in cols:
+        bdf[col] = df[col].apply(apply_binarize).astype('int8')
+    bdf = bdf.sort_values(by=cols, ascending=False)
+    sdf = df.reindex(bdf.index)
+    
+    sdf['code'] = bdf.apply(apply_encode, axis=1)       
+    
+    agg_params = {}
+    for col in cols:
+        agg_params[col] = 'sum'
+    adf = sdf.groupby(['code'], observed=True).agg( agg_params ).reset_index()
+    adf = adf.drop( 'code', axis=1)
+    
+    if lognorm:
+        logging.debug(f'log normalizing for better heatmap values. ')
+        adf = adf + 1
+        adf = np.log(adf)
+    return adf
+
+
+def plot_heatmap_motifs(nbmdf):
+    '''
+    From Yara el Zoghby at HTNA 2025 CSHL
+    
+    '''
+    binary_df = (nbmdf > 0).astype(int)
+    # Each barcode's pattern across brain areas, as a string or tuple
+    patterns = binary_df.apply(lambda row: tuple(row), axis=1)
+    # Count frequency of each pattern
+    pattern_counts = patterns.value_counts().sort_values(ascending=False)
+    # Display top 10 most frequent projection motifs
+    for pattern, count in pattern_counts.head(10).items():
+        areas_in_pattern = [area for area, present in zip(binary_df.columns, pattern) if present]
+        print(f'Pattern {areas_in_pattern}: {count} barcodes')
+        import numpy as np
+    top_patterns = pattern_counts.head(10).index.to_list()
+    top_counts = pattern_counts.head(10).values
+    # Build matrix: rows=motifs, cols=brain areas (0/1)
+    motif_matrix = np.array(top_patterns)
+    plt.figure(figsize=(12, 6))
+    sns.heatmap(motif_matrix, cmap='Greys', cbar=False, xticklabels=binary_df.columns, yticklabels=[f'Motif {i+1} ({c})' for i, c in enumerate(top_counts)])
+    plt.title('Top 10 Projection Motifs (Brain Area Presence)')
+    plt.xlabel('Brain Area')
+    plt.ylabel('Motif (with count)')
+    plt.tight_layout()
+    plt.savefig('top_10_projection_motifs_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.show()
 
 
 #

@@ -109,4 +109,7 @@ if __name__ == '__main__':
         outdir = dirname
         
     sampdf = load_sample_info(cp, args.sampleinfo)
-    make_heatmaps_combined_sns(cp, sampdf, args.infiles, outfile=args.outfile, outdir=outdir, expid=args.expid )
+    make_clustermap_pdf( args.infiles,
+                         sampdf=sampdf, 
+                         outfile=args.outfile,  
+                         config=cp)
