@@ -355,7 +355,7 @@ def make_clustermap_pdf( infiles,
     sys.setrecursionlimit(recursion)  
     
     clustermap_scale = config.get('plots','clustermap_scale') # log10 | log2
-    cmap = config.get('plots','heatmap_cmap')
+    cmap = config.get('plots','heatmap_cmap', fallback='Blues')
     logging.debug(f'clustermap_scale={clustermap_scale} cmap={cmap}')
 
     if outfile is None:
@@ -423,8 +423,8 @@ def get_plot_binarized(nbcdf, expid=None, info='binarized'):
         expid = 'M000'
     nbcdf = nbcdf.astype('float')
     sbdf = binarize_sort_matrix(nbcdf )
-    g = plot_binarized(sbdf, expid = expid, info=info)
-    return g
+    ax = plot_binarized(sbdf, expid = expid, info=info)
+    return ax
 
 def get_plot_heatmap(nbcdf, label='heatmap', cp=None):
     '''
@@ -456,8 +456,8 @@ def plot_binarized(sbdf, expid=None, info='binarized'):
     num_vbcs = len(sbdf)
   
     plt.figure(figsize=(10,8))
-    g = sns.heatmap(sbdf, yticklabels=False, cmap='Blues',cbar=False)
-    g.figure.suptitle(f'{expid}\n{num_vbcs} VBCs\n{info}')    
+    ax = sns.heatmap(sbdf, yticklabels=False, cmap='Blues',cbar=False)
+    ax.figure.suptitle(f'{expid}\n{num_vbcs} VBCs\n{info}')    
     return g
 
 
